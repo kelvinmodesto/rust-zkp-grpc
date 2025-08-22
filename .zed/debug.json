@@ -2,10 +2,15 @@
   {
     "label": "Build & Debug native binary",
     "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "${workspaceFolder}/target/debug/rust-zkp-grpc",
     "build": {
       "command": "cargo",
       "args": ["build"]
     },
-    "sourceLanguages": ["rust"]
+    "sourceLanguages": ["rust"],
+    "cwd": "${workspaceFolder}",
+    "args": ["--config", "debug.toml"],
+    "env": {}
   }
 ]
