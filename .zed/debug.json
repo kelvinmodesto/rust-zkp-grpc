@@ -1,16 +1,30 @@
 [
   {
-    "label": "Build & Debug native binary",
+    "label": "Build & Debug Server",
     "adapter": "CodeLLDB",
     "request": "launch",
-    "program": "${workspaceFolder}/target/debug/rust-zkp-grpc",
+    "program": "${workspaceFolder}/target/debug/server",
     "build": {
       "command": "cargo",
-      "args": ["build"]
+      "args": ["build", "--bin", "server"]
     },
     "sourceLanguages": ["rust"],
     "cwd": "${workspaceFolder}",
-    "args": ["--config", "debug.toml"],
+    "args": [],
+    "env": {}
+  },
+  {
+    "label": "Build & Debug Client",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "${workspaceFolder}/target/debug/client",
+    "build": {
+      "command": "cargo",
+      "args": ["build", "--bin", "client"]
+    },
+    "sourceLanguages": ["rust"],
+    "cwd": "${workspaceFolder}",
+    "args": [],
     "env": {}
   }
 ]
