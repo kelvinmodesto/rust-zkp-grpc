@@ -1,0 +1,12 @@
+services:
+  zkpserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./:/zkp-server
+    environment:
+      - USER=kelvinmodesto
+    container_name: zkpserver
