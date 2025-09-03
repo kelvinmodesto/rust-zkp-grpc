@@ -1,12 +1,11 @@
-use hex;
 use num_bigint::{BigUint, RandBigInt};
-use rand::thread_rng;
+use rand::{Rng, distributions::Alphanumeric, thread_rng};
 
 pub struct ZKP {
-    p: BigUint,
-    q: BigUint,
-    alpha: BigUint,
-    beta: BigUint,
+    pub p: BigUint,
+    pub q: BigUint,
+    pub alpha: BigUint,
+    pub beta: BigUint,
 }
 
 impl ZKP {
@@ -46,6 +45,14 @@ impl ZKP {
     pub fn generate_random_lower_than(bound: &BigUint) -> BigUint {
         let mut rn = thread_rng();
         rn.gen_biguint_below(bound)
+    }
+
+    pub fn generate_random_string(size: usize) -> String {
+        thread_rng()
+            .sample_iter(Alphanumeric)
+            .take(size)
+            .map(char::from)
+            .collect()
     }
 
     pub fn get_constants() -> (BigUint, BigUint, BigUint, BigUint) {

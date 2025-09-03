@@ -1,8 +1,8 @@
 use num_bigint::BigUint;
-use rust_zkp_grpc::ZKP;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tonic::{Code, Request, Response, Status, transport::Server};
+use zkp_grpc::ZKP;
 
 pub mod zkp_auth {
     include!("./zkp_auth.rs");
@@ -51,7 +51,7 @@ impl Auth for AuthImpl {
         user_info.y1 = BigUint::from_bytes_be(&request.y1);
         user_info.y2 = BigUint::from_bytes_be(&request.y2);
 
-        let mut user_info_hashmap = &mut self.user_info.lock().unwrap();
+        let user_info_hashmap = &mut self.user_info.lock().unwrap();
         user_info_hashmap.insert(user_name, user_info);
 
         Ok(Response::new(RegisterResponse {}))
@@ -60,15 +60,15 @@ impl Auth for AuthImpl {
         &self,
         req: Request<AuthenticationChallengeRequest>,
     ) -> Result<Response<AuthenticationChallengeResponse>, Status> {
-        println!("Processing Register: {:?}", req);
+        println!("Creating Authentication Challenge: {:?}", req);
         let request = req.into_inner();
         let user_name = request.user;
 
-        let mut user_info_hashmap = &mut self.user_info.lock().unwrap();
+        let user_info_hashmap = &mut self.user_info.lock().unwrap();
         if let Some(user_info) = user_info_hashmap.get_mut(&user_name) {
             let (_, _, _, q) = ZKP::get_constants();
             let c = ZKP::generate_random_lower_than(&q);
-            let auth_id = "sdkjfsf".to_string();
+            let auth_id = ZKP::generate_random_string(12);
 
             user_info.c = c.clone();
             user_info.r1 = BigUint::from_bytes_be(&request.r1);
@@ -93,7 +93,48 @@ impl Auth for AuthImpl {
         &self,
         req: Request<AuthenticationAnswerRequest>,
     ) -> Result<Response<AuthenticationAnswerResponse>, Status> {
-        todo!()
+        println!("Verifying Authentication: {:?}", req);
+        let request = req.into_inner();
+        let auth_id = request.auth_id;
+
+        let auth_id_user_hash = &mut self.auth_id_to_user.lock().unwrap();
+
+        if let Some(user_name) = auth_id_user_hash.get(&auth_id) {
+            let user_info_hash = &mut self.user_info.lock().unwrap();
+            let user_info = user_info_hash
+                .get(user_name)
+                .expect("auth_id not found on hashmap");
+
+            let s = BigUint::from_bytes_be(&request.s);
+            // user_info.s = s.clone();
+
+            let (alpha, beta, p, q) = ZKP::get_constants();
+            let zkp = ZKP { alpha, beta, p, q };
+
+            let verification = zkp.verify(
+                &user_info.r1,
+                &user_info.r2,
+                &user_info.y1,
+                &user_info.y2,
+                &user_info.c,
+                &s,
+            );
+
+            if verification {
+                let session_id = ZKP::generate_random_string(12);
+                Ok(Response::new(AuthenticationAnswerResponse { session_id }))
+            } else {
+                Err(Status::new(
+                    Code::PermissionDenied,
+                    format!("AuthId {} sent a bad solution to the challenge", auth_id),
+                ))
+            }
+        } else {
+            Err(Status::new(
+                Code::NotFound,
+                format!("Authentication id {} not found on database", auth_id),
+            ))
+        }
     }
 }
 

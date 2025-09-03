@@ -1,6 +1,6 @@
 
 [package]
-name = "rust-zkp-grpc"
+name = "zkp-grpc"
 version = "0.1.0"
 edition = "2024"
 
