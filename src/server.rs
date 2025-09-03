@@ -102,11 +102,11 @@ impl Auth for AuthImpl {
         if let Some(user_name) = auth_id_user_hash.get(&auth_id) {
             let user_info_hash = &mut self.user_info.lock().unwrap();
             let user_info = user_info_hash
-                .get(user_name)
+                .get_mut(user_name)
                 .expect("auth_id not found on hashmap");
 
             let s = BigUint::from_bytes_be(&request.s);
-            // user_info.s = s.clone();
+            user_info.s = s.clone();
 
             let (alpha, beta, p, q) = ZKP::get_constants();
             let zkp = ZKP { alpha, beta, p, q };
