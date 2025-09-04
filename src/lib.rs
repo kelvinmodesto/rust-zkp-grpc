@@ -252,4 +252,188 @@ mod tests {
         let result: bool = zkp.verify(&r1, &r2, &y1, &y2, &c, &s);
         assert!(result);
     }
+
+    #[test]
+    fn test_compute_pair_basic() {
+        let alpha = BigUint::from(4u32);
+        let beta = BigUint::from(9u32);
+        let p = BigUint::from(23u32);
+        let q = BigUint::from(11u32);
+
+        let zkp = ZKP {
+            p: p.clone(),
+            q,
+            alpha,
+            beta,
+        };
+
+        // Test with exponent = 1
+        let exp = BigUint::from(1u32);
+        let (p1, p2) = zkp.compute_pair(&exp);
+        assert_eq!(p1, BigUint::from(4u32)); // alpha^1 mod p = 4
+        assert_eq!(p2, BigUint::from(9u32)); // beta^1 mod p = 9
+
+        // Test with exponent = 2
+        let exp = BigUint::from(2u32);
+        let (p1, p2) = zkp.compute_pair(&exp);
+        assert_eq!(p1, BigUint::from(16u32)); // 4^2 mod 23 = 16
+        assert_eq!(p2, BigUint::from(12u32)); // 9^2 mod 23 = 81 mod 23 = 12
+
+        // Test with exponent = 0
+        let exp = BigUint::from(0u32);
+        let (p1, p2) = zkp.compute_pair(&exp);
+        assert_eq!(p1, BigUint::from(1u32)); // alpha^0 mod p = 1
+        assert_eq!(p2, BigUint::from(1u32)); // beta^0 mod p = 1
+    }
+
+    #[test]
+    fn test_compute_pair_with_large_exponent() {
+        let alpha = BigUint::from(4u32);
+        let beta = BigUint::from(9u32);
+        let p = BigUint::from(23u32);
+        let q = BigUint::from(11u32);
+
+        let zkp = ZKP {
+            p: p.clone(),
+            q,
+            alpha: alpha.clone(),
+            beta: beta.clone(),
+        };
+
+        // Test with a larger exponent
+        let exp = BigUint::from(6u32);
+        let (p1, p2) = zkp.compute_pair(&exp);
+
+        // Verify by computing manually
+        let expected_p1 = alpha.modpow(&exp, &p);
+        let expected_p2 = beta.modpow(&exp, &p);
+
+        assert_eq!(p1, expected_p1);
+        assert_eq!(p2, expected_p2);
+    }
+
+    #[test]
+    fn test_compute_pair_with_constants() {
+        let (alpha, beta, p, q) = ZKP::get_constants();
+
+        let zkp = ZKP {
+            p: p.clone(),
+            q: q.clone(),
+            alpha: alpha.clone(),
+            beta: beta.clone(),
+        };
+
+        let exp = BigUint::from(5u32);
+        let (p1, p2) = zkp.compute_pair(&exp);
+
+        // Verify the results match manual computation
+        let expected_p1 = alpha.modpow(&exp, &p);
+        let expected_p2 = beta.modpow(&exp, &p);
+
+        assert_eq!(p1, expected_p1);
+        assert_eq!(p2, expected_p2);
+
+        // Ensure results are within modulus bounds
+        assert!(p1 < p);
+        assert!(p2 < p);
+    }
+
+    #[test]
+    fn test_get_constants_values() {
+        let (alpha, beta, p, q) = ZKP::get_constants();
+
+        // Test that p matches the expected 1024-bit prime from RFC 5114
+        let expected_p = BigUint::from_bytes_be(&hex::decode("B10B8F96A080E01DDE92DE5EAE5D54EC52C99FBCFB06A3C69A6A9DCA52D23B616073E28675A23D189838EF1E2EE652C013ECB4AEA906112324975C3CD49B83BFACCBDD7D90C4BD7098488E9C219A73724EFFD6FAE5644738FAA31A4FF55BCCC0A151AF5F0DC8B4BD45BF37DF365C1A65E68CFDA76D4DA708DF1FB2BC2E4A4371").unwrap());
+        assert_eq!(p, expected_p);
+
+        // Test that q matches the expected 160-bit prime from RFC 5114
+        let expected_q = BigUint::from_bytes_be(
+            &hex::decode("F518AA8781A8DF278ABA4E7D64B7CB9D49462353").unwrap(),
+        );
+        assert_eq!(q, expected_q);
+
+        // Test that alpha matches the expected generator from RFC 5114
+        let expected_alpha = BigUint::from_bytes_be(&hex::decode("A4D1CBD5C3FD34126765A442EFB99905F8104DD258AC507FD6406CFF14266D31266FEA1E5C41564B777E690F5504F213160217B4B01B886A5E91547F9E2749F4D7FBD7D3B9A92EE1909D0D2263F80A76A6A24C087A091F531DBF0A0169B6A28AD662A4D18E73AFA32D779D5918D08BC8858F4DCEF97C2A24855E6EEB22B3B2E5").unwrap());
+        assert_eq!(alpha, expected_alpha);
+
+        // Verify that beta is computed correctly (alpha^exp mod p)
+        let exp = BigUint::from_bytes_be(&hex::decode("266FEA1E5C41564B777E69").unwrap());
+        let expected_beta = alpha.modpow(&exp, &p);
+        assert_eq!(beta, expected_beta);
+    }
+
+    #[test]
+    fn test_get_constants_properties() {
+        let (alpha, beta, p, q) = ZKP::get_constants();
+
+        // Test that alpha and beta are within the correct range (1 < alpha, beta < p)
+        assert!(alpha > BigUint::from(1u32));
+        assert!(alpha < p);
+        assert!(beta > BigUint::from(1u32));
+        assert!(beta < p);
+
+        // Test that q divides p-1 (this is a requirement for DSA parameters)
+        let p_minus_1 = &p - BigUint::from(1u32);
+        assert_eq!(&p_minus_1 % &q, BigUint::from(0u32));
+
+        // Test that alpha^q mod p = 1 (alpha should have order q)
+        assert_eq!(alpha.modpow(&q, &p), BigUint::from(1u32));
+
+        // Test that beta^q mod p = 1 (beta should also have order q)
+        assert_eq!(beta.modpow(&q, &p), BigUint::from(1u32));
+    }
+
+    #[test]
+    fn test_get_constants_in_zkp_workflow() {
+        let (alpha, beta, p, q) = ZKP::get_constants();
+
+        let zkp = ZKP {
+            p: p.clone(),
+            q: q.clone(),
+            alpha: alpha.clone(),
+            beta: beta.clone(),
+        };
+
+        // Test that the constants work in a complete ZKP workflow
+        let x = ZKP::generate_random_lower_than(&q);
+        let k = ZKP::generate_random_lower_than(&q);
+        let c = ZKP::generate_random_lower_than(&q);
+
+        // Use compute_pair to generate the commitment values
+        let (y1, y2) = zkp.compute_pair(&x);
+        let (r1, r2) = zkp.compute_pair(&k);
+
+        let s = zkp.solve(&k, &c, &x);
+        let result = zkp.verify(&r1, &r2, &y1, &y2, &c, &s);
+
+        // The ZKP protocol should work correctly with the constants
+        assert!(result);
+    }
+
+    #[test]
+    fn test_compute_pair_consistency() {
+        let (alpha, beta, p, q) = ZKP::get_constants();
+
+        let zkp = ZKP {
+            p: p.clone(),
+            q,
+            alpha: alpha.clone(),
+            beta: beta.clone(),
+        };
+
+        let exp1 = BigUint::from(3u32);
+        let exp2 = BigUint::from(7u32);
+        let combined_exp = &exp1 + &exp2; // exp1 + exp2 = 10
+
+        let (p1_exp1, p2_exp1) = zkp.compute_pair(&exp1);
+        let (p1_exp2, p2_exp2) = zkp.compute_pair(&exp2);
+        let (p1_combined, p2_combined) = zkp.compute_pair(&combined_exp);
+
+        // Test multiplicative property: (alpha^exp1 * alpha^exp2) mod p = alpha^(exp1+exp2) mod p
+        let p1_product = (&p1_exp1 * &p1_exp2) % &p;
+        let p2_product = (&p2_exp1 * &p2_exp2) % &p;
+
+        assert_eq!(p1_combined, p1_product);
+        assert_eq!(p2_combined, p2_product);
+    }
 }
